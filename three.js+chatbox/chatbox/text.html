@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Mercury</title>
+  <link rel="stylesheet" media="screen" href="css/style.css">
+  <style>
+    #container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #particles-js,
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    #particles-js {
+	  background-color: #000000;
+	  backgroung-size: 100%;
+	  background-position: center;
+	  background-repeat: no-repeat;
+      width: 100%;
+      height: 100%;
+    }
+
+    #canvas-container {
+      pointer-events: none;
+    }
+
+    #txtShow {
+      position: absolute;
+      top: 100px;
+      left: center;
+      pointer-events: none;
+      width: center;
+      height: center;
+	  padding: center;
+	  margin: center;
+	  overflow-y:scroll;
+	  color: white;
+    }
+
+    #txtInput {
+      position: absolute;
+      bottom: 50px;
+      left: center;
+      width: center;
+	  padding: 10px;
+	  margin: 10px;
+	  overflow-y: scroll;
+    }
+
+    #btnSend {
+      position: absolute;
+      bottom: 50px;
+      right: 32%;
+	  border: 2px solid #fff;
+	  padding: 5px 20px;
+	  margin: 10px;
+	  cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script>
+$(document).ready(function(){
+  $('#txtInput').keypress(function(e) {
+    var key = window.event ? e.keyCode : e.which;
+    if (key == 13)
+      $('#btnSend').click();
+  });
+  // 發送訊息
+$("#btnSend").on("click", function () {
+  let txt = $("#txtInput").val();
+  $("#txtInput").val("");
+  let data = {
+    user: "Jean", // 使用者名稱-->與資料庫進行連線
+    message: txt, // 訊息內容
+  };
+  ws.send(JSON.stringify(data));
+});
+
+})
+// 使用 WebSocket 的網址向 Server 開啟連結
+var ws = new WebSocket('ws://localhost:3000/mercury');
+
+var timerID = 0;
+
+function keepAlive() {
+    var timeout = 20000; // 20 seconds
+    if (ws.readyState === ws.OPEN) {
+      ws.send(); 
+    }
+    timerID = setTimeout(keepAlive, timeout);
+  }
+
+function cancelKeepAlive() {
+  if (timerID) {
+    clearTimeout(timerID);
+  }
+}
+
+ws.onopen = () => {
+  console.log('open connection');
+  
+  //連線建立後啟動keepAlive
+  keepAlive();
+};
+
+ws.onclose = () => {
+  console.log('close connection');
+  //連線關閉後取消keepAlive
+  cancelKeepAlive();
+};
+
+//接收 Server 發送的訊息
+ws.onmessage = event => {
+  console.log(event);
+  if (event.data instanceof Blob) {
+    var reader = new FileReader();
+    reader.addEventListener("loadend", function() {
+      if(!$("#txtShow").val())
+        $("#txtShow").val(reader.result);
+      else
+        $("#txtShow").val($("#txtShow").val()+"\n"+reader.result);
+    });
+    reader.readAsText(event.data);
+	
+  } else {
+	$("#txtShow").show();
+    if(!$("#txtShow").val())
+      $("#txtShow").val(event.data);
+    else
+      $("#txtShow").val($("#txtShow").val()+"\n"+event.data);
+  }
+  let data = JSON.parse(event.data);
+  let cssClass = data.user === "user1" ? "sent" : "received"; // 判斷是否為當前使用者發送的訊息
+  let html = `<div class="${cssClass}">
+               <span class="user">${data.user}: </span>
+               <span class="message">${data.message}</span>
+             </div>`;
+  $("#txtShow").append(html);
+};
+
+</script>
+
+<!-- count particles -->
+<div class="count-particles">
+  <span class="js-count-particles">--</span> particles
+</div>
+
+<!-- particles.js container -->
+<div id="particles-js"></div>
+
+<!-- scripts -->
+<script src="../particles.js"></script>
+<script src="js/app.js"></script>
+
+<!-- stats.js -->
+<script src="js/lib/stats.js"></script>
+<script>
+  var count_particles, stats, update;
+  stats = new Stats;
+  stats.setMode(0);
+  stats.domElement.style.position = 'absolute';
+  stats.domElement.style.left = '0px';
+  stats.domElement.style.top = '0px';
+  document.body.appendChild(stats.domElement);
+  count_particles = document.querySelector('.js-count-particles');
+  update = function() {
+    stats.begin();
+    stats.end();
+    if (window.pJSDom[0].pJS.particles && window.pJSDom[0].pJS.particles.array) {
+      count_particles.innerText = window.pJSDom[0].pJS.particles.array.length;
+    }
+    requestAnimationFrame(update);
+  };
+  requestAnimationFrame(update);
+</script>
+<textarea id="txtShow" style="height:60vmin;width:80vmin" disabled></textarea></br>
+<input id="txtInput" style="width:80vmin" type="text">
+<input type="button" id="btnSend" value="Send">
+</body>
+</html>
